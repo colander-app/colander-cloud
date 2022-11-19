@@ -1,0 +1,32 @@
+Event Table Design:
+
+interface Event {
+	resource_id: string
+	start: string // ISO-8601
+	end: string // ISO-8601
+}
+
+interface Subscription {
+	resource_id: string
+	websocket_id: string
+}
+
+table: Event
+	PI:
+		partition key: resource_id
+		sort key: start_date
+	GSI:
+		partition key: resource_id
+		sort key: end_date
+	GSI:
+		partition key: subscription_resource_id
+
+getEventsInWindow(VIEW_START, VIEW_END):
+	results_1 = Query(resource_id=X, start_date <= VIEW_END)
+	results_2 = Query(resource_id=X, end_date >= VIEW_START)
+	return merge_unique(results_1, results_2, merge_key="id")
+
+insertEvent(EVENT):
+	Insert(event)
+	subscriptions = Query(resource_id=event.resource_id)
+	subscriptions.map(subscription => send_event(subscription, event))

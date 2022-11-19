@@ -1,0 +1,209 @@
+service:
+  name: colander-cloud
+
+custom:
+  webpack:
+    webpackConfig: ./webpack.config.js
+    includeModules: true
+
+plugins:
+  - serverless-webpack
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  websocketApiRouteSelectionExpression: $request.body.action
+  apiGateway:
+    minimumCompressionSize: 1024 # Enable gzip compression for responses > 1 KB
+  environment:
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - 'dynamodb:DescribeTable'
+        - 'dynamodb:Query'
+        - 'dynamodb:Scan'
+        - 'dynamodb:PutItem'
+        - 'dynamodb:UpdateItem'
+        - 'dynamodb:DeleteItem'
+      Resource:
+        - {
+            'Fn::Join':
+              [
+                '',
+                [{ 'Fn::GetAtt': ['organizationTable', 'Arn'] }, '/index/*'],
+              ],
+          }
+        - { 'Fn::GetAtt': ['organizationTable', 'Arn'] }
+        - {
+            'Fn::Join':
+              ['', [{ 'Fn::GetAtt': ['resourceTable', 'Arn'] }, '/index/*']],
+          }
+        - { 'Fn::GetAtt': ['resourceTable', 'Arn'] }
+        - {
+            'Fn::Join':
+              ['', [{ 'Fn::GetAtt': ['projectTable', 'Arn'] }, '/index/*']],
+          }
+        - { 'Fn::GetAtt': ['projectTable', 'Arn'] }
+        - {
+            'Fn::Join':
+              ['', [{ 'Fn::GetAtt': ['eventTable', 'Arn'] }, '/index/*']],
+          }
+        - { 'Fn::GetAtt': ['eventTable', 'Arn'] }
+
+functions:
+  # wsConnect:
+  #   handler: src/entry/websocket.connect
+  #   events:
+  #     - websocket: $connect
+  # wsDisconnect:
+  #   handler: src/entry/websocket.disconnect
+  #   events:
+  #     - websocket: $disconnect
+  # onMessage:
+  #   handler: src/entry/websocket.onMessage
+  #   events:
+  #     - websocket: $default
+  subscribeToEventRange:
+    handler: src/websocket/events.onSubscribeToEventRange
+    events:
+      - websocket:
+          route: subscribeToEventRange
+  putEvent:
+    handler: src/websocket/events.onPutEvent
+    events:
+      - websocket:
+          route: putEvent
+  eventStreamHandler:
+    handler: src/dynamo/events.handler
+    events:
+      - stream:
+          type: dynamodb
+          batchSize: 1
+          startingPosition: LATEST
+          arn:
+            Fn::GetAtt:
+              - eventTable
+              - StreamArn
+
+resources:
+  Resources:
+    organizationTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: Organization
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: updatedAt
+            AttributeType: N
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+          - AttributeName: updatedAt
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+
+    projectTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: Project
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: updatedAt
+            AttributeType: N
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+          - AttributeName: updatedAt
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+
+    resourceTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: Resource
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: updatedAt
+            AttributeType: N
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+          - AttributeName: updatedAt
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+
+    eventTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: Event
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: resource_id
+            AttributeType: S
+          - AttributeName: websocket_id
+            AttributeType: S
+          - AttributeName: start_date
+            AttributeType: S
+          - AttributeName: end_date
+            AttributeType: S
+          - AttributeName: subscription_resource_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: ResourceStartIndex
+            KeySchema:
+              - AttributeName: resource_id
+                KeyType: HASH
+              - AttributeName: start_date
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'ALL'
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: ResourceEndIndex
+            KeySchema:
+              - AttributeName: resource_id
+                KeyType: HASH
+              - AttributeName: end_date
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'ALL'
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: SubscriptionResourceIndex
+            KeySchema:
+              - AttributeName: subscription_resource_id
+                KeyType: HASH
+              - AttributeName: websocket_id
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'ALL'
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
