@@ -1,63 +1,57 @@
 import { APIGatewayProxyHandler } from 'aws-lambda'
-import { getEventsInRange, putEvent } from '../lib/event'
+import { putEvent } from '../lib/event'
 import {
-  getSubscriptions,
-  putSubscription,
-  sendMessage,
-} from '../lib/websocket'
+  putEventSubscription,
+  removeEventSubscription,
+} from '../lib/subscription'
+import {
+  getAPIGatewayEventBody,
+  proxyEventFailed,
+  proxyEventSuccess,
+} from '../utils/lambda/apigateway'
 
 /**
- * Event Body:
- * { query: { resource_id:string, start:string, end:string } }
+ * Subscribe to events by resource on a given time window
  */
 export const onSubscribeToEventRange: APIGatewayProxyHandler = async (
   event
 ) => {
   try {
-    const query = JSON.parse(event.body).query
-
-    // Create subscription in event table
-    const connection_id = event.requestContext.connectionId
-    await putSubscription(connection_id, query.resource_id)
-
-    // Get initial events within range
-    const initial_events = await getEventsInRange(
-      query.resource_id,
-      query.start_date,
-      query.end_date
-    )
-
-    // Send events to client
-    await sendMessage(event, connection_id, JSON.stringify(initial_events))
+    const { query } = getAPIGatewayEventBody(event)
+    const requestContext = {
+      connectionId: event.requestContext.connectionId,
+      domainName: event.requestContext.domainName,
+      stage: event.requestContext.stage,
+    }
+    await putEventSubscription(requestContext, query)
   } catch (err) {
-    console.log('Failed to subscribe', err)
-    return { statusCode: 500, body: 'Failed to subscribe.' }
+    return proxyEventFailed(err)
   }
-  return { statusCode: 200, body: 'Subscribed.' }
+  return proxyEventSuccess()
+}
+
+/**
+ * Unsubscribe a websocket from a resource
+ */
+export const onUnsubscribeFromEventRange: APIGatewayProxyHandler = async (
+  event
+) => {
+  try {
+    const { data } = getAPIGatewayEventBody(event)
+    const { connectionId } = event.requestContext
+    await removeEventSubscription(connectionId!, data.resource_id)
+  } catch (err) {
+    return proxyEventFailed(err)
+  }
+  return proxyEventSuccess()
 }
 
 export const onPutEvent: APIGatewayProxyHandler = async (event) => {
   try {
-    const data = JSON.parse(event.body).data
-    const { resource_id } = data
-
-    // create the event
-    console.log('Putting event', data)
+    const { data } = getAPIGatewayEventBody(event)
     await putEvent(data)
-
-    // then get all websocket subscriptions for resource
-    console.log('get subs:', resource_id)
-    const subscriptions = await getSubscriptions(resource_id)
-    console.log('subs:', subscriptions, data)
-    await Promise.allSettled(
-      subscriptions.map((subscription) =>
-        sendMessage(event, subscription.id, JSON.stringify([data]))
-      )
-    )
   } catch (err) {
-    const message = 'Failed to create event. ' + JSON.stringify(err)
-    console.log(message, err)
-    return { statusCode: 500, body: message }
+    return proxyEventFailed(err)
   }
-  return { statusCode: 200, body: 'Created event.' }
+  return proxyEventSuccess()
 }

@@ -1,27 +1,35 @@
 import { DynamoDB } from 'aws-sdk'
+import { IEvent, isEvent } from '../models/event'
 
 const ddb = new DynamoDB.DocumentClient({
   apiVersion: '2012-08-10',
   region: process.env.AWS_REGION,
 })
 
-export const putEvent = async (item) => {
-  try {
-    console.log('Creating event', item)
-    await ddb.put({ TableName: 'Event', Item: item }).promise()
-  } catch (err) {
-    console.log('Failed to create event', err)
+/**
+ * Validate and add an event into the Event Table
+ */
+export const putEvent = async (item: unknown): Promise<void> => {
+  if (!isEvent(item)) {
+    throw new Error('Not a valid event')
   }
+  const put_request = { TableName: 'Event', Item: item }
+  await ddb.put(put_request).promise()
 }
 
+/**
+ * Query events by both the EventByResourceStartDate and EventByResourceEndDate indexes
+ * return the merged unique results
+ */
 export const getEventsInRange = async (
   resource_id: string,
   start_date: string,
   end_date: string
-) => {
+): Promise<IEvent[]> => {
+  // Query events matching start date index
   const query_left = {
     TableName: 'Event',
-    IndexName: 'ResourceStartIndex',
+    IndexName: 'EventByResourceStartDate',
     KeyConditionExpression: 'resource_id = :r AND start_date <= :e',
     ExpressionAttributeValues: {
       ':r': resource_id,
@@ -29,9 +37,10 @@ export const getEventsInRange = async (
     },
   }
 
+  // Query events matching end date index
   const query_right = {
     TableName: 'Event',
-    IndexName: 'ResourceEndIndex',
+    IndexName: 'EventByResourceEndDate',
     KeyConditionExpression: 'resource_id = :r AND end_date >= :s',
     ExpressionAttributeValues: {
       ':r': resource_id,
@@ -39,18 +48,28 @@ export const getEventsInRange = async (
     },
   }
 
-  const results_left = await ddb.query(query_left).promise()
-  const results_right = await ddb.query(query_right).promise()
-  const merged_results = [...results_left.Items, ...results_right.Items]
-  return merged_results
-}
+  // Execute queries
+  const results_left = (await ddb.query(query_left).promise()).Items ?? []
+  const results_right = (await ddb.query(query_right).promise()).Items ?? []
 
-export const listEvents = async () => {
-  try {
-    const itemData = await ddb.scan({ TableName: 'Event' }).promise()
-    return itemData.Items
-  } catch (err) {
-    console.log('Failed to list events', err)
-    return []
-  }
+  // Get unique event ids
+  const event_ids = [...results_left, ...results_right]
+    .map((r) => r.id)
+    .filter((id, i, arr) => arr.indexOf(id) === i)
+
+  // Get all event details
+  const events =
+    (
+      await ddb
+        .batchGet({
+          RequestItems: {
+            Event: {
+              Keys: event_ids.map((id) => ({ id })),
+            },
+          },
+        })
+        .promise()
+    ).Responses?.['Event'] ?? []
+
+  return events as IEvent[]
 }
