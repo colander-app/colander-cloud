@@ -4,6 +4,7 @@ import { JTDDataType } from 'ajv/dist/jtd'
 const schema = {
   type: 'object',
   properties: {
+    __type: { const: 'event' },
     id: { type: 'string' },
     resource_id: { type: 'string' },
     start_date: { type: 'string' },
@@ -11,9 +12,10 @@ const schema = {
     label: { type: 'string' },
     color: { type: 'string' },
     tentative: { type: 'boolean' },
-    updatedAt: { type: 'string' },
+    updated_at: { type: 'string' },
   },
   required: [
+    '__type',
     'id',
     'resource_id',
     'start_date',
@@ -21,7 +23,7 @@ const schema = {
     'label',
     'color',
     'tentative',
-    'updatedAt',
+    'updated_at',
   ],
 } as const
 

@@ -9,6 +9,39 @@ const ddb = new DynamoDB.DocumentClient({
   region: process.env.AWS_REGION,
 })
 
+export const putEventSubscription = async (
+  requestContext: {
+    connectionId?: string
+    domainName?: string
+    stage?: string
+  },
+  query: {
+    resource_id: string
+    start_date: string
+    end_date: string
+  }
+): Promise<void> => {
+  const subscription = {
+    __type: 'eventSubscription',
+    id: `${requestContext.connectionId}_${query.resource_id}`,
+    websocket_id: requestContext.connectionId,
+    requestContext,
+    subscription_resource_id: query.resource_id,
+    query: {
+      start_date: query.start_date,
+      end_date: query.end_date,
+    },
+  }
+  if (!isEventSubscription(subscription)) {
+    throw new Error('Invalid subscription format')
+  }
+  const put_request = {
+    TableName: 'Event',
+    Item: subscription,
+  }
+  await ddb.put(put_request).promise()
+}
+
 /**
  * Remove websocket event subscription for a resource
  */
@@ -70,39 +103,4 @@ export const getEventSubscriptionsByResource = async (
     console.log('Failed to get connections', err.message)
     return []
   }
-}
-
-/**
- * Validate and add an eventSubscription into the Event Table
- */
-export const putEventSubscription = async (
-  requestContext: {
-    connectionId?: string
-    domainName?: string
-    stage?: string
-  },
-  query: {
-    resource_id: string
-    start_date: string
-    end_date: string
-  }
-): Promise<void> => {
-  const subscription = {
-    id: `${requestContext.connectionId}_${query.resource_id}`,
-    websocket_id: requestContext.connectionId,
-    requestContext,
-    subscription_resource_id: query.resource_id,
-    query: {
-      start_date: query.start_date,
-      end_date: query.end_date,
-    },
-  }
-  if (!isEventSubscription(subscription)) {
-    throw new Error('Invalid subscription format')
-  }
-  const put_request = {
-    TableName: 'Event',
-    Item: subscription,
-  }
-  await ddb.put(put_request).promise()
 }

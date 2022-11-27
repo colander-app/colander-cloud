@@ -38,16 +38,6 @@ provider:
         - { 'Fn::GetAtt': ['organizationTable', 'Arn'] }
         - {
             'Fn::Join':
-              ['', [{ 'Fn::GetAtt': ['resourceTable', 'Arn'] }, '/index/*']],
-          }
-        - { 'Fn::GetAtt': ['resourceTable', 'Arn'] }
-        - {
-            'Fn::Join':
-              ['', [{ 'Fn::GetAtt': ['projectTable', 'Arn'] }, '/index/*']],
-          }
-        - { 'Fn::GetAtt': ['projectTable', 'Arn'] }
-        - {
-            'Fn::Join':
               ['', [{ 'Fn::GetAtt': ['eventTable', 'Arn'] }, '/index/*']],
           }
         - { 'Fn::GetAtt': ['eventTable', 'Arn'] }
@@ -82,71 +72,71 @@ functions:
             Fn::GetAtt:
               - eventTable
               - StreamArn
+  #
+  # Resource functions
+  #
+  putResource:
+    handler: src/websocket/resources.onPutResource
+    events:
+      - websocket:
+          route: putResource
+  #
+  # Project functions
+  #
+  putProject:
+    handler: src/websocket/projects.onPutProject
+    events:
+      - websocket:
+          route: putProject
+  #
+  # Organization functions
+  #
+  putOrganization:
+    handler: src/websocket/organizations.onPutOrganization
+    events:
+      - websocket:
+          route: putOrganization
 
 resources:
   Resources:
+    #
+    # Store orgs, resources, layouts and their subscriptions
+    #
     organizationTable:
       Type: AWS::DynamoDB::Table
       Properties:
         TableName: Organization
-        AttributeDefinitions:
-          - AttributeName: id
-            AttributeType: S
-          - AttributeName: updatedAt
-            AttributeType: N
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-          - AttributeName: updatedAt
-            KeyType: RANGE
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        StreamSpecification:
-          StreamViewType: NEW_AND_OLD_IMAGES
-
-    projectTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: Project
         AttributeDefinitions:
           - AttributeName: id
             AttributeType: S
-          - AttributeName: updatedAt
-            AttributeType: N
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-          - AttributeName: updatedAt
-            KeyType: RANGE
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
-        StreamSpecification:
-          StreamViewType: NEW_AND_OLD_IMAGES
-
-    resourceTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: Resource
-        StreamSpecification:
-          StreamViewType: NEW_AND_OLD_IMAGES
-        AttributeDefinitions:
-          - AttributeName: id
+          - AttributeName: organization_id
             AttributeType: S
-          - AttributeName: updatedAt
-            AttributeType: N
         KeySchema:
           - AttributeName: id
             KeyType: HASH
-          - AttributeName: updatedAt
-            KeyType: RANGE
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
+        GlobalSecondaryIndexes:
+          #
+          # Group items that are related to an organization
+          #
+          - IndexName: ItemByOrganization
+            KeySchema:
+              - AttributeName: organization_id
+                KeyType: HASH
+              - AttributeName: id
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'KEYS_ONLY'
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
 
     #
-    # Store events and event range websocket subscriptions
+    # Store events, projects and their subscriptions
     #
     eventTable:
       Type: AWS::DynamoDB::Table
@@ -162,7 +152,6 @@ resources:
             AttributeType: S
           - AttributeName: resource_id
             AttributeType: S
-          # A composite attribute of ws connection id and resource id
           - AttributeName: subscription_resource_id
             AttributeType: S
           - AttributeName: websocket_id

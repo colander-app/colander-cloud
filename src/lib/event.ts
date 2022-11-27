@@ -6,9 +6,6 @@ const ddb = new DynamoDB.DocumentClient({
   region: process.env.AWS_REGION,
 })
 
-/**
- * Validate and add an event into the Event Table
- */
 export const putEvent = async (item: unknown): Promise<void> => {
   if (!isEvent(item)) {
     throw new Error('Not a valid event')

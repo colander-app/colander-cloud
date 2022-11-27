@@ -4,6 +4,7 @@ import { JTDDataType } from 'ajv/dist/jtd'
 const schema = {
   type: 'object',
   properties: {
+    __type: { const: 'eventSubscription' },
     id: { type: 'string' },
     websocket_id: { type: 'string' },
     subscription_resource_id: { type: 'string' },
@@ -26,7 +27,7 @@ const schema = {
       // required: ['resource_id', 'start_date', 'end_date'],
     },
   },
-  required: ['id', 'websocket_id', 'subscription_resource_id'],
+  required: ['__type', 'id', 'websocket_id', 'subscription_resource_id'],
 } as const
 
 export type IEventSubscription = JTDDataType<typeof schema>
