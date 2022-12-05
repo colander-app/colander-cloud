@@ -2,8 +2,8 @@ import { APIGatewayProxyHandler } from 'aws-lambda'
 import { putEvent } from '../lib/event'
 import {
   putEventSubscription,
-  removeEventSubscription,
-} from '../lib/subscription'
+  removeEventSubscriptionByResource,
+} from '../lib/eventSubscription'
 import {
   getAPIGatewayEventBody,
   proxyEventFailed,
@@ -30,7 +30,11 @@ export const onSubscribeToEventRange: APIGatewayProxyHandler = async (
       domainName: event.requestContext.domainName,
       stage: event.requestContext.stage,
     }
-    await putEventSubscription(requestContext, query)
+    const { resource_ids, ...restOfQuery } = query
+    const requests = resource_ids.map((resource_id) =>
+      putEventSubscription(requestContext, { resource_id, ...restOfQuery })
+    )
+    await Promise.allSettled(requests)
   } catch (err) {
     return proxyEventFailed(err)
   }
@@ -43,7 +47,10 @@ export const onUnsubscribeFromEventRange: APIGatewayProxyHandler = async (
   try {
     const { data } = getAPIGatewayEventBody(event)
     const { connectionId } = event.requestContext
-    await removeEventSubscription(connectionId!, data.resource_id)
+    const requests = data.resource_ids.map((id) =>
+      removeEventSubscriptionByResource(connectionId!, id)
+    )
+    await Promise.allSettled(requests)
   } catch (err) {
     return proxyEventFailed(err)
   }

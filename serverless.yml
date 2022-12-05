@@ -5,9 +5,28 @@ custom:
   webpack:
     webpackConfig: ./webpack.config.js
     includeModules: true
+  capacities:
+    - table: organizationTable
+      index:
+        - ItemByOrganization
+      read:
+        minimum: 1
+        maximum: 10
+        usage: 0.90
+    - table: eventTable
+      index:
+        - EventByResourceStartDate
+        - EventByResourceEndDate
+        - WsSubscriptionById
+        - WsSubscriptionByResource
+      read:
+        minimum: 1
+        maximum: 10
+        usage: 0.90
 
 plugins:
   - serverless-webpack
+  - serverless-dynamodb-autoscaling
 
 provider:
   name: aws
@@ -44,6 +63,14 @@ provider:
 
 functions:
   #
+  # Generic websocket functions
+  #
+  disconnectWs:
+    handler: src/websocket/connection.onDisconnect
+    events:
+      - websocket:
+          route: $disconnect
+  #
   # Event functions
   #
   subscribeToEventRange:
@@ -51,6 +78,7 @@ functions:
     events:
       - websocket:
           route: subscribeToEventRange
+    provisionedConcurrency: 5
   unsubscribeFromEventRange:
     handler: src/websocket/events.onUnsubscribeFromEventRange
     events:
@@ -61,6 +89,7 @@ functions:
     events:
       - websocket:
           route: putEvent
+    provisionedConcurrency: 5
   eventStreamHandler:
     handler: src/dynamo/events.handler
     events:
@@ -72,6 +101,7 @@ functions:
             Fn::GetAtt:
               - eventTable
               - StreamArn
+    provisionedConcurrency: 5
   #
   # Resource functions
   #
@@ -200,6 +230,8 @@ resources:
             KeySchema:
               - AttributeName: websocket_id
                 KeyType: HASH
+              - AttributeName: id
+                KeyType: RANGE
             Projection:
               ProjectionType: 'KEYS_ONLY'
             ProvisionedThroughput:
@@ -215,7 +247,7 @@ resources:
               - AttributeName: websocket_id
                 KeyType: RANGE
             Projection:
-              ProjectionType: 'ALL'
+              ProjectionType: 'KEYS_ONLY'
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1

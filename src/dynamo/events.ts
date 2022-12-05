@@ -1,7 +1,7 @@
 import { DynamoDB } from 'aws-sdk'
 import { DynamoDBStreamHandler } from 'aws-lambda'
 import { getEventsInRange } from '../lib/event'
-import { getEventSubscriptionsByResource } from '../lib/subscription'
+import { getEventSubscriptionsByResource } from '../lib/eventSubscription'
 import { isEventSubscription } from '../models/eventSubscription'
 import { isEvent } from '../models/event'
 import { sendMessage } from '../lib/websocket'

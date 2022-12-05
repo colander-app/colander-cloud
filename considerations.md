@@ -1,0 +1,3 @@
+- How we will abstract ddb calls. The lib api is very generic ddb.put, ddb.batchWrite, ddb.query... so it should be easy to abstract calls to those functions, then just decide on how to construct queries/requests for a given operation.
+- How to manage table / index names and their usage in code. Table names and index names should be thought of as long-term ephemeral names, rather than a firm consistent name (eg. Prod.Event.1 instead of Event) since tables and indexes seem fairly fluid. Obviously, indexes could be costly to create/modify in the future but still the same rule applies.
+- How will we get the websocket endpoint url to the web app

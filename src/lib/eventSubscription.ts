@@ -42,33 +42,61 @@ export const putEventSubscription = async (
   await ddb.put(put_request).promise()
 }
 
-/**
- * Remove websocket event subscription for a resource
- */
-export const removeEventSubscription = async (
+export const removeEventSubscriptionByResource = async (
   connection_id: string,
   resource_id: string
 ) => {
-  // const query_subscriptions = {
-  //   TableName: 'Event',
-  // }
-  // const events = (await ddb.query(query_subscriptions).promise()).Items
-  // const delete_requests = events?.map(({ id }) => ({
-  //   DeleteRequest: { Key: { id } },
-  // }))
-  // return ddb.batchWrite({
-  //   RequestItems: {
-  //     Event: [
-  //       {
-  //         DeleteRequest: {
-  //           Key: {
-  //             id,
-  //           },
-  //         },
-  //       },
-  //     ],
-  //   },
-  // })
+  const query_subscriptions = {
+    TableName: 'Event',
+    IndexName: 'WsSubscriptionByResource',
+    KeyConditionExpression:
+      'subscription_resource_id = :rid AND websocket_id = :wsid',
+    ExpressionAttributeValues: {
+      ':rid': resource_id,
+      ':wsid': connection_id,
+    },
+  }
+  const subscriptions = (await ddb.query(query_subscriptions).promise()).Items
+  const delete_requests = subscriptions?.map(({ id }) => ({
+    DeleteRequest: { Key: { id } },
+  }))
+  if (delete_requests) {
+    await ddb.batchWrite({
+      RequestItems: {
+        Event: delete_requests,
+      },
+    })
+    console.log('deleted', delete_requests.length, 'items')
+  } else {
+    console.log('no items deleted')
+  }
+}
+
+export const removeEventSubscriptionsByConnection = async (
+  connection_id: string
+) => {
+  const query_subscriptions = {
+    TableName: 'Event',
+    IndexName: 'WsSubscriptionById',
+    KeyConditionExpression: 'websocket_id = :id',
+    ExpressionAttributeValues: {
+      ':id': connection_id,
+    },
+  }
+  const subscriptions = (await ddb.query(query_subscriptions).promise()).Items
+  const delete_requests = subscriptions?.map(({ id }) => ({
+    DeleteRequest: { Key: { id } },
+  }))
+  if (delete_requests) {
+    await ddb.batchWrite({
+      RequestItems: {
+        Event: delete_requests,
+      },
+    })
+    console.log('deleted', delete_requests.length, 'items')
+  } else {
+    console.log('no items deleted')
+  }
 }
 
 /**
