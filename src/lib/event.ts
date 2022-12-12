@@ -14,6 +14,36 @@ export const putEvent = async (item: unknown): Promise<void> => {
   await ddb.put(put_request).promise()
 }
 
+export const getItemsForResource = async (
+  resource_id: string
+): Promise<unknown[]> => {
+  const query = {
+    TableName: 'Event',
+    IndexName: 'ItemByResource',
+    KeyConditionExpression: 'resource_id = :r',
+    ExpressionAttributeValues: {
+      ':r': resource_id,
+    },
+  }
+  const key_items = (await ddb.query(query).promise()).Items ?? []
+  const key_item_ids = key_items.map(({ id }) => ({ id })) ?? []
+
+  const items =
+    (
+      await ddb
+        .batchGet({
+          RequestItems: {
+            Event: {
+              Keys: key_item_ids,
+            },
+          },
+        })
+        .promise()
+    ).Responses?.['Event'] ?? []
+
+  return items ?? []
+}
+
 /**
  * Query events by both the EventByResourceStartDate and EventByResourceEndDate indexes
  * return the merged unique results

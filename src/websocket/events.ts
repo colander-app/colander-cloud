@@ -4,11 +4,15 @@ import {
   putEventSubscription,
   removeEventSubscriptionByResource,
 } from '../lib/eventSubscription'
+import { toSeconds } from '../utils/converter'
+import { getExpiryInSeconds } from '../utils/date'
 import {
   getAPIGatewayEventBody,
   proxyEventFailed,
   proxyEventSuccess,
 } from '../utils/lambda/apigateway'
+
+const EXPIRE_SUBSCRIPTION_SECONDS = toSeconds(2, 'hr')
 
 export const onPutEvent: APIGatewayProxyHandler = async (event) => {
   try {
@@ -32,9 +36,13 @@ export const onSubscribeToEventRange: APIGatewayProxyHandler = async (
     }
     const { resource_ids, ...restOfQuery } = query
     const requests = resource_ids.map((resource_id) =>
-      putEventSubscription(requestContext, { resource_id, ...restOfQuery })
+      putEventSubscription(
+        requestContext,
+        { resource_id, ...restOfQuery },
+        getExpiryInSeconds(EXPIRE_SUBSCRIPTION_SECONDS)
+      )
     )
-    await Promise.allSettled(requests)
+    console.log(await Promise.allSettled(requests))
   } catch (err) {
     return proxyEventFailed(err)
   }

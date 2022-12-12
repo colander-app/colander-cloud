@@ -19,15 +19,18 @@ export const putEventSubscription = async (
     resource_id: string
     start_date: string
     end_date: string
-  }
+  },
+  expire_at: number
 ): Promise<void> => {
   const subscription = {
     __type: 'eventSubscription',
     id: `${requestContext.connectionId}_${query.resource_id}`,
     websocket_id: requestContext.connectionId,
     requestContext,
+    expire_at,
     subscription_resource_id: query.resource_id,
     query: {
+      resource_id: query.resource_id,
       start_date: query.start_date,
       end_date: query.end_date,
     },
@@ -48,7 +51,7 @@ export const removeEventSubscriptionByResource = async (
 ) => {
   const query_subscriptions = {
     TableName: 'Event',
-    IndexName: 'WsSubscriptionByResource',
+    IndexName: 'SubscriptionByResource',
     KeyConditionExpression:
       'subscription_resource_id = :rid AND websocket_id = :wsid',
     ExpressionAttributeValues: {
@@ -100,9 +103,9 @@ export const removeEventSubscriptionsByConnection = async (
 }
 
 /**
- * Query event subscriptions by resource id
+ * Query event subscriptions by resource id and range
  */
-export const getEventSubscriptionsByResource = async (
+export const getEventSubscriptionsByResourceAndRange = async (
   resource_id: string,
   start_date: string,
   end_date: string
@@ -110,7 +113,7 @@ export const getEventSubscriptionsByResource = async (
   try {
     const subscription_query = {
       TableName: 'Event',
-      IndexName: 'WsSubscriptionByResource',
+      IndexName: 'SubscriptionByResource',
       KeyConditionExpression: '#subscription_resource_id = :r',
       FilterExpression: '#query.#start <= :e AND #query.#end >= :s',
       ExpressionAttributeNames: {
@@ -123,6 +126,32 @@ export const getEventSubscriptionsByResource = async (
         ':r': resource_id,
         ':s': start_date,
         ':e': end_date,
+      },
+    }
+    const subscriptionsData = await ddb.query(subscription_query).promise()
+    return subscriptionsData.Items as IEventSubscription[]
+  } catch (err) {
+    console.log('Failed to get connections', err.message)
+    return []
+  }
+}
+
+/**
+ * Query event subscriptions by resource id
+ */
+export const getEventSubscriptionsByResource = async (
+  resource_id: string
+): Promise<IEventSubscription[]> => {
+  try {
+    const subscription_query = {
+      TableName: 'Event',
+      IndexName: 'SubscriptionByResource',
+      KeyConditionExpression: '#subscription_resource_id = :r',
+      ExpressionAttributeNames: {
+        '#subscription_resource_id': 'subscription_resource_id',
+      },
+      ExpressionAttributeValues: {
+        ':r': resource_id,
       },
     }
     const subscriptionsData = await ddb.query(subscription_query).promise()

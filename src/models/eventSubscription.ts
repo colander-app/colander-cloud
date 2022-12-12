@@ -1,11 +1,30 @@
-import Ajv from 'ajv'
-import { JTDDataType } from 'ajv/dist/jtd'
+import { JSONSchemaType } from 'ajv'
+import { validateSchema } from '../utils/validate-schema'
 
-const schema = {
+export interface IEventSubscription {
+  __type: 'eventSubscription'
+  id: string
+  expire_at: number
+  websocket_id: string
+  subscription_resource_id: string
+  requestContext: {
+    connectionId: string
+    domainName: string
+    stage: string
+  }
+  query: {
+    resource_id: string
+    start_date: string
+    end_date: string
+  }
+}
+
+const schema: JSONSchemaType<IEventSubscription> = {
   type: 'object',
   properties: {
-    __type: { const: 'eventSubscription' },
+    __type: { type: 'string', const: 'eventSubscription' },
     id: { type: 'string' },
+    expire_at: { type: 'number' },
     websocket_id: { type: 'string' },
     subscription_resource_id: { type: 'string' },
     requestContext: {
@@ -15,7 +34,7 @@ const schema = {
         domainName: { type: 'string' },
         stage: { type: 'string' },
       },
-      // required: ['connectionId', 'domainName', 'stage'],
+      required: ['connectionId', 'domainName', 'stage'],
     },
     query: {
       type: 'object',
@@ -24,18 +43,18 @@ const schema = {
         start_date: { type: 'string' },
         end_date: { type: 'string' },
       },
-      // required: ['resource_id', 'start_date', 'end_date'],
+      required: ['resource_id', 'start_date', 'end_date'],
     },
   },
-  required: ['__type', 'id', 'websocket_id', 'subscription_resource_id'],
-} as const
-
-export type IEventSubscription = JTDDataType<typeof schema>
-
-const ajv = new Ajv()
-export const isEventSubscription = (
-  input: any
-): input is IEventSubscription => {
-  const validate = ajv.compile(schema)
-  return validate(input)
+  required: [
+    '__type',
+    'id',
+    'expire_at',
+    'websocket_id',
+    'subscription_resource_id',
+    'requestContext',
+    'query',
+  ],
 }
+
+export const isEventSubscription = validateSchema<IEventSubscription>(schema)

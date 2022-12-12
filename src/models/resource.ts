@@ -1,22 +1,23 @@
-import Ajv from 'ajv'
-import { JTDDataType } from 'ajv/dist/jtd'
+import { JSONSchemaType } from 'ajv'
+import { validateSchema } from '../utils/validate-schema'
 
-const schema = {
+export interface IResource {
+  __type: 'resource'
+  id: string
+  name: string
+  organization_id: string
+  updated_at: string
+}
+
+const schema: JSONSchemaType<IResource> = {
   type: 'object',
   properties: {
-    __type: { const: 'resource' },
+    __type: { type: 'string', const: 'resource' },
     id: { type: 'string' },
     name: { type: 'string' },
     organization_id: { type: 'string' },
     updated_at: { type: 'string' },
   },
   required: ['__type', 'id', 'name', 'organization_id', 'updated_at'],
-} as const
-
-export type IResource = JTDDataType<typeof schema>
-
-const ajv = new Ajv()
-export const isResource = (input: any): input is IResource => {
-  const validate = ajv.compile(schema)
-  return validate(input)
 }
+export const isResource = validateSchema<IResource>(schema)

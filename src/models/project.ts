@@ -1,12 +1,21 @@
-import Ajv from 'ajv'
-import { JTDDataType } from 'ajv/dist/jtd'
+import { JSONSchemaType } from 'ajv'
+import { validateSchema } from '../utils/validate-schema'
 
 const MAX_EVENTS_PER_PROJECT = 250
 
-const schema = {
+export interface IProject {
+  __type: 'project'
+  id: string
+  name: string
+  events: Array<string>
+  organization_id: string
+  updated_at: string
+}
+
+const schema: JSONSchemaType<IProject> = {
   type: 'object',
   properties: {
-    __type: { const: 'project' },
+    __type: { type: 'string', const: 'project' },
     id: { type: 'string' },
     name: { type: 'string' },
     events: {
@@ -20,12 +29,6 @@ const schema = {
     updated_at: { type: 'string' },
   },
   required: ['__type', 'id', 'name', 'events', 'organization_id', 'updated_at'],
-} as const
-
-export type IProject = JTDDataType<typeof schema>
-
-const ajv = new Ajv()
-export const isProject = (input: any): input is IProject => {
-  const validate = ajv.compile(schema)
-  return validate(input)
 }
+
+export const isProject = validateSchema<IProject>(schema)

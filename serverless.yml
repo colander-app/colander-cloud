@@ -18,15 +18,21 @@ custom:
         - EventByResourceStartDate
         - EventByResourceEndDate
         - WsSubscriptionById
-        - WsSubscriptionByResource
+        - SubscriptionByResource
+        - ItemByResource
       read:
-        minimum: 1
+        minimum: 2
         maximum: 10
-        usage: 0.90
+        usage: 0.85
+      write:
+        minimum: 2
+        maximum: 10
+        usage: 0.85
 
 plugins:
   - serverless-webpack
   - serverless-dynamodb-autoscaling
+  # - serverless-iam-roles-per-function
 
 provider:
   name: aws
@@ -60,6 +66,20 @@ provider:
               ['', [{ 'Fn::GetAtt': ['eventTable', 'Arn'] }, '/index/*']],
           }
         - { 'Fn::GetAtt': ['eventTable', 'Arn'] }
+    - Effect: Allow
+      Action:
+        - 's3:PutObject'
+        - 's3:GetObject'
+        - 's3:DeleteObject'
+        - 's3:AbortMultipartUpload'
+        - 's3:ListMultipartUploadParts'
+        - 's3:ListBucketMultipartUploads'
+      Resource:
+        - { 'Fn::GetAtt': ['uploadsBucket', 'Arn'] }
+        - {
+            'Fn::Join':
+              ['', [{ 'Fn::GetAtt': ['uploadsBucket', 'Arn'] }, '/*']],
+          }
 
 functions:
   #
@@ -71,6 +91,14 @@ functions:
       - websocket:
           route: $disconnect
   #
+  # Uploads
+  #
+  putUpload:
+    handler: src/websocket/upload.onPutUpload
+    events:
+      - websocket:
+          route: putUpload
+  #
   # Event functions
   #
   subscribeToEventRange:
@@ -78,7 +106,6 @@ functions:
     events:
       - websocket:
           route: subscribeToEventRange
-    provisionedConcurrency: 5
   unsubscribeFromEventRange:
     handler: src/websocket/events.onUnsubscribeFromEventRange
     events:
@@ -89,7 +116,6 @@ functions:
     events:
       - websocket:
           route: putEvent
-    provisionedConcurrency: 5
   eventStreamHandler:
     handler: src/dynamo/events.handler
     events:
@@ -101,7 +127,6 @@ functions:
             Fn::GetAtt:
               - eventTable
               - StreamArn
-    provisionedConcurrency: 5
   #
   # Resource functions
   #
@@ -177,6 +202,9 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
+        TimeToLiveSpecification:
+          AttributeName: expire_at
+          Enabled: true
         AttributeDefinitions:
           - AttributeName: id
             AttributeType: S
@@ -240,14 +268,50 @@ resources:
           #
           # Contains websocket subscriptions by resource id
           #
-          - IndexName: WsSubscriptionByResource
+          - IndexName: SubscriptionByResource
             KeySchema:
               - AttributeName: subscription_resource_id
                 KeyType: HASH
               - AttributeName: websocket_id
                 KeyType: RANGE
             Projection:
+              ProjectionType: 'INCLUDE'
+              NonKeyAttributes:
+                - requestContext
+                - query
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          #
+          # Contains all items for a given resource
+          #
+          - IndexName: ItemByResource
+            KeySchema:
+              - AttributeName: resource_id
+                KeyType: HASH
+              - AttributeName: id
+                KeyType: RANGE
+            Projection:
               ProjectionType: 'KEYS_ONLY'
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1
+    uploadsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: colander-uploads
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+        CorsConfiguration:
+          CorsRules:
+            - AllowedMethods:
+                - GET
+                - HEAD
+                - PUT
+              ExposedHeaders:
+                - ETag
+              AllowedOrigins:
+                - 'https://*.colanderapp.io'
+                - 'http://local.colanderapp.io:5173'

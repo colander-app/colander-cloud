@@ -1,10 +1,22 @@
-import Ajv from 'ajv'
-import { JTDDataType } from 'ajv/dist/jtd'
+import { JSONSchemaType } from 'ajv'
+import { validateSchema } from '../utils/validate-schema'
 
-const schema = {
+export interface IEvent {
+  __type: 'event'
+  id: string
+  resource_id: string
+  start_date: string
+  end_date: string
+  label: string
+  color: string
+  tentative: boolean
+  updated_at: string
+}
+
+const schema: JSONSchemaType<IEvent> = {
   type: 'object',
   properties: {
-    __type: { const: 'event' },
+    __type: { type: 'string', const: 'event' },
     id: { type: 'string' },
     resource_id: { type: 'string' },
     start_date: { type: 'string' },
@@ -25,12 +37,6 @@ const schema = {
     'tentative',
     'updated_at',
   ],
-} as const
-
-export type IEvent = JTDDataType<typeof schema>
-
-const ajv = new Ajv()
-export const isEvent = (input: any): input is IEvent => {
-  const validate = ajv.compile(schema)
-  return validate(input)
 }
+
+export const isEvent = validateSchema<IEvent>(schema)

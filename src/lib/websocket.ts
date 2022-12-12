@@ -1,5 +1,6 @@
 import { APIGatewayProxyEvent } from 'aws-lambda'
 import { ApiGatewayManagementApi } from 'aws-sdk'
+import { sliceMessageChunks } from '../utils/frame'
 
 export const enum ErrorResponses {
   NonExistent = 'NonExistent',
@@ -22,12 +23,22 @@ export const sendMessage = async (
     endpoint: requestContext.domainName + '/' + requestContext.stage,
   })
   try {
+    // const frames = sliceMessageChunks(message)
+    // const promises = frames.map(async (frame) => {
     await apigwMgmtApi
       .postToConnection({
         ConnectionId: connection_id,
         Data: message,
       })
       .promise()
+    // })
+    // const results = await Promise.allSettled(promises)
+    // const failed = results
+    //   .map((result) => (result.status === 'rejected' ? result.reason : false))
+    //   .filter(Boolean)
+    // if (failed.length > 0) {
+    //   console.error('failed to send message to clients:', failed.length)
+    // }
   } catch (err) {
     console.log('Failed to send message', err.message)
     if (err.statusCode === 410) {
