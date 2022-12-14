@@ -1,6 +1,5 @@
 import { APIGatewayProxyEvent } from 'aws-lambda'
 import { ApiGatewayManagementApi } from 'aws-sdk'
-import { sliceMessageChunks } from '../utils/frame'
 
 export const enum ErrorResponses {
   NonExistent = 'NonExistent',
@@ -10,7 +9,7 @@ export const enum ErrorResponses {
 /**
  * Send a JSON message to a websocket client
  */
-export const sendMessage = async (
+export const IOSendMessageWS = async (
   requestContext: Pick<
     APIGatewayProxyEvent['requestContext'],
     'domainName' | 'stage'

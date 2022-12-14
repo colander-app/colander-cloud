@@ -1,5 +1,6 @@
 import { DynamoDB } from 'aws-sdk'
-import { IEvent, isEvent } from '../models/event'
+import { IEvent, isEvent } from '@models/event'
+import { IOPutItem } from '@services/ddb'
 
 const ddb = new DynamoDB.DocumentClient({
   apiVersion: '2012-08-10',
@@ -10,13 +11,12 @@ export const putEvent = async (item: unknown): Promise<void> => {
   if (!isEvent(item)) {
     throw new Error('Not a valid event')
   }
-  const put_request = { TableName: 'Event', Item: item }
-  await ddb.put(put_request).promise()
+  await IOPutItem('Event', item)
 }
 
 export const getItemsForResource = async (
   resource_id: string
-): Promise<unknown[]> => {
+): Promise<Record<any, any>[]> => {
   const query = {
     TableName: 'Event',
     IndexName: 'ItemByResource',

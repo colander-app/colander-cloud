@@ -1,15 +1,15 @@
 import { APIGatewayProxyHandler } from 'aws-lambda'
-import { putProject } from '../lib/project'
+import { putUpload } from '@controllers/upload'
 import {
   getAPIGatewayEventBody,
   proxyEventFailed,
   proxyEventSuccess,
-} from '../utils/lambda/apigateway'
+} from '@utils/lambda/apigateway'
 
-export const onPutProject: APIGatewayProxyHandler = async (event) => {
+export const onPutUpload: APIGatewayProxyHandler = async (event) => {
   try {
     const { data } = getAPIGatewayEventBody(event)
-    await putProject(data)
+    await putUpload(data)
   } catch (err) {
     return proxyEventFailed(err)
   }

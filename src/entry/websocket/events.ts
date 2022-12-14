@@ -1,16 +1,16 @@
 import { APIGatewayProxyHandler } from 'aws-lambda'
-import { putEvent } from '../lib/event'
+import { putEvent } from '@lib/event'
 import {
   putEventSubscription,
   removeEventSubscriptionByResource,
-} from '../lib/eventSubscription'
-import { toSeconds } from '../utils/converter'
-import { getExpiryInSeconds } from '../utils/date'
+} from '@lib/eventSubscription'
+import { toSeconds } from '@utils/converter'
+import { getExpiryInSeconds } from '@utils/date'
 import {
   getAPIGatewayEventBody,
   proxyEventFailed,
   proxyEventSuccess,
-} from '../utils/lambda/apigateway'
+} from '@utils/lambda/apigateway'
 
 const EXPIRE_SUBSCRIPTION_SECONDS = toSeconds(2, 'hr')
 

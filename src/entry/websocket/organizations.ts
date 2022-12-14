@@ -1,10 +1,10 @@
 import { APIGatewayProxyHandler } from 'aws-lambda'
-import { putOrganization } from '../lib/organization'
+import { putOrganization } from '@lib/organization'
 import {
   getAPIGatewayEventBody,
   proxyEventFailed,
   proxyEventSuccess,
-} from '../utils/lambda/apigateway'
+} from '@utils/lambda/apigateway'
 
 export const onPutOrganization: APIGatewayProxyHandler = async (event) => {
   try {

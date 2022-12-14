@@ -7,7 +7,8 @@ export const validateSchema =
     const validate = ajv.compile(schema)
     const valid = validate(input)
     if (!valid) {
-      console.error('validation errors:', ajv.errorsText(validate.errors))
+      // TODO: find a way to log validation errors
+      // console.error('validation errors:', ajv.errorsText(validate.errors))
     }
     return valid
   }

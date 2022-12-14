@@ -1,11 +1,12 @@
 import { JSONSchemaType } from 'ajv'
-import { toBytes, toSeconds } from '../utils/converter'
-import { validateSchema } from '../utils/validate-schema'
+import { toBytes, toSeconds } from '@utils/converter'
+import { validateSchema } from '@utils/validate-schema'
 
 export const MAX_CONCURRENT_PART_UPLOADS = 2
 export const MAX_BYTES = toBytes(590, 'mb')
 export const UPLOAD_PART_SIZE = toBytes(5, 'mb')
 export const EXPIRE_UPLOAD_SECONDS = toSeconds(8, 'hr')
+export const EXPIRE_UPLOAD_READLINK = toSeconds(7, 'day')
 
 export interface UploadPart {
   uploaded: boolean
@@ -20,8 +21,7 @@ export interface IUpload {
   __type: 'upload'
   id: string
   upload_id?: string
-  status: 'uploading' | 'failed-max-size' | 'complete'
-  expire_at: number
+  status: 'uploading' | 'failed-max-size' | 'failed' | 'complete'
   event_id: string
   resource_id: string
   uploader: string
@@ -29,6 +29,10 @@ export interface IUpload {
   content_type: string
   size: number
   parts?: Array<UploadPart>
+  read_link?: {
+    expire_at: number
+    url: string
+  }
   updated_at: string
 }
 
@@ -40,15 +44,23 @@ const schema: JSONSchemaType<IUpload> = {
     upload_id: { type: 'string', nullable: true },
     status: {
       type: 'string',
-      enum: ['uploading', 'failed-max-size', 'complete'],
+      enum: ['uploading', 'failed-max-size', 'failed', 'complete'],
     },
-    expire_at: { type: 'number' },
     event_id: { type: 'string' },
     resource_id: { type: 'string' },
     uploader: { type: 'string' },
     filename: { type: 'string' },
     content_type: { type: 'string' },
     size: { type: 'number' },
+    read_link: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        expire_at: { type: 'number' },
+        url: { type: 'string' },
+      },
+      required: ['expire_at', 'url'],
+    },
     parts: {
       type: 'array',
       nullable: true,
@@ -73,7 +85,6 @@ const schema: JSONSchemaType<IUpload> = {
     '__type',
     'id',
     'status',
-    'expire_at',
     'event_id',
     'resource_id',
     'uploader',
