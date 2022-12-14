@@ -86,7 +86,7 @@ functions:
   # Generic websocket functions
   #
   disconnectWs:
-    handler: src/websocket/connection.onDisconnect
+    handler: src/entry/websocket/connection.onDisconnect
     events:
       - websocket:
           route: $disconnect
@@ -94,7 +94,7 @@ functions:
   # Uploads
   #
   putUpload:
-    handler: src/websocket/upload.onPutUpload
+    handler: src/entry/websocket/upload.onPutUpload
     events:
       - websocket:
           route: putUpload
@@ -102,22 +102,22 @@ functions:
   # Event functions
   #
   subscribeToEventRange:
-    handler: src/websocket/events.onSubscribeToEventRange
+    handler: src/entry/websocket/events.onSubscribeToEventRange
     events:
       - websocket:
           route: subscribeToEventRange
   unsubscribeFromEventRange:
-    handler: src/websocket/events.onUnsubscribeFromEventRange
+    handler: src/entry/websocket/events.onUnsubscribeFromEventRange
     events:
       - websocket:
           route: unsubscribeFromEventRange
   putEvent:
-    handler: src/websocket/events.onPutEvent
+    handler: src/entry/websocket/events.onPutEvent
     events:
       - websocket:
           route: putEvent
   eventStreamHandler:
-    handler: src/dynamo/events.handler
+    handler: src/entry/dynamo/events.handler
     events:
       - stream:
           type: dynamodb
@@ -131,7 +131,7 @@ functions:
   # Resource functions
   #
   putResource:
-    handler: src/websocket/resources.onPutResource
+    handler: src/entry/websocket/resources.onPutResource
     events:
       - websocket:
           route: putResource
@@ -139,7 +139,7 @@ functions:
   # Project functions
   #
   putProject:
-    handler: src/websocket/projects.onPutProject
+    handler: src/entry/websocket/projects.onPutProject
     events:
       - websocket:
           route: putProject
@@ -147,7 +147,7 @@ functions:
   # Organization functions
   #
   putOrganization:
-    handler: src/websocket/organizations.onPutOrganization
+    handler: src/entry/websocket/organizations.onPutOrganization
     events:
       - websocket:
           route: putOrganization
