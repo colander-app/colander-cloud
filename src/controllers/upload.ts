@@ -1,24 +1,18 @@
-import { getEventSubscriptionsByResource } from '@lib/eventSubscription'
-import { IOAddReadLinkToUpload } from '@lib/upload/readLink'
-import { IOPutItem } from '@services/ddb'
-import { IOSendMessageWS } from '@services/websocket'
-import {
-  isUpload,
-  IUpload,
-  MAX_BYTES,
-  MAX_CONCURRENT_PART_UPLOADS,
-  UploadPart,
-  UPLOAD_PART_SIZE,
-} from '@models/upload'
+import { IOgetEventSubscriptionsByResource } from '@/lib/eventSubscription'
+import { IOAddReadLinkToUpload } from '@/lib/upload/readLink'
+import { IOPutItem } from '@/services/ddb'
+import { IONotifySubscribers } from '@/services/websocket'
+import { isUpload, IUpload } from '@/models/upload'
 import {
   IOCompleteMultipartUpload,
   IOCreateMultipartUpload,
   IOMakeSignedS3URL,
-} from '@services/s3'
-import { IOLogRejectedPromises } from '@services/log'
-
-// Ensure we don't create an infinite loop updating upload state
-const MAX_ITERATIVE_UPDATES = 50
+} from '@/services/s3'
+import * as lib from '@/lib/upload/multipart'
+import {
+  MAX_CONCURRENT_PART_UPLOADS,
+  MAX_ITERATIVE_UPDATES,
+} from '@/lib/upload/constants'
 
 export const onPutUpload = async (item: Record<any, any>) => {
   if (!isUpload(item)) {
@@ -27,79 +21,6 @@ export const onPutUpload = async (item: Record<any, any>) => {
   await IOPutItem('Event', item)
 }
 
-export const isUploadTooBig = (upload: IUpload) => upload.size > MAX_BYTES
-
-export const uploadPartNeedsCleaned = (part: UploadPart) =>
-  Boolean(part.uploaded && part.signed_upload_url)
-
-export const partIsUploading = (part: UploadPart) =>
-  Boolean(!part.uploaded && part.signed_upload_url)
-
-export const uploadPartCanUpload = (
-  part: UploadPart,
-  concurrentUploads: number,
-  maxConcurrent: number
-) =>
-  Boolean(
-    !part.uploaded &&
-      !part.signed_upload_url &&
-      concurrentUploads < maxConcurrent
-  )
-
-export const uploadHasAllPartsUploaded = (upload: IUpload) =>
-  upload.parts?.every((part) => part.uploaded && part.etag)
-
-export const changeUploadStatus = (
-  upload: IUpload,
-  status: IUpload['status']
-): IUpload => ({
-  ...upload,
-  status,
-})
-
-export const addMultipartUpload = (
-  upload: IUpload,
-  upload_id: string
-): IUpload => ({ ...upload, upload_id })
-
-export const addAllUploadParts = (upload: IUpload): IUpload => {
-  const numOfParts = Math.ceil(upload.size / UPLOAD_PART_SIZE)
-  return {
-    ...upload,
-    parts: [...new Array(numOfParts)].map((_, i) => ({
-      uploaded: false,
-      start_byte: i * UPLOAD_PART_SIZE,
-      end_byte: i === numOfParts - 1 ? upload.size : (i + 1) * UPLOAD_PART_SIZE,
-      part: i + 1,
-    })),
-  }
-}
-
-export const addSignedUploadUrlToPart = (
-  part: UploadPart,
-  signed_upload_url?: string
-): UploadPart => ({
-  ...part,
-  signed_upload_url,
-})
-
-export const updateUploadParts = (
-  upload: IUpload,
-  parts: UploadPart[]
-): IUpload => ({
-  ...upload,
-  parts,
-})
-
-export const completeUpload = (upload: IUpload): IUpload => ({
-  ...changeUploadStatus(upload, 'complete'),
-  parts: undefined,
-  upload_id: undefined,
-})
-
-/**
- * This controller primarily deals with communicating multipart file uploads
- */
 export const onUploadChanged = async (
   item: IUpload,
   iterations = 0
@@ -118,8 +39,8 @@ export const onUploadChanged = async (
 
   // only perform any iterative upload logic while in the uploading status
   if (item.status === 'uploading') {
-    if (isUploadTooBig(item)) {
-      return modifyUpload(changeUploadStatus(item, 'failed-max-size'))
+    if (lib.isUploadTooBig(item)) {
+      return modifyUpload(lib.changeUploadStatus(item, 'failed-max-size'))
     }
 
     if (!item.upload_id) {
@@ -128,22 +49,22 @@ export const onUploadChanged = async (
         key: Key,
         contentType: item.content_type,
       })
-      return modifyUpload(addMultipartUpload(item, uploadId))
+      return modifyUpload(lib.addMultipartUpload(item, uploadId))
     }
 
     if (!item.parts) {
-      return modifyUpload(addAllUploadParts(item))
+      return modifyUpload(lib.addAllUploadParts(item))
     }
 
     let changedParts = false
-    let currentUploadCount = item.parts.filter(partIsUploading).length
+    let currentUploadCount = item.parts.filter(lib.partIsUploading).length
     const partUpdates = item.parts.map(async (part) => {
-      if (uploadPartNeedsCleaned(part)) {
+      if (lib.uploadPartNeedsCleaned(part)) {
         changedParts = true
-        return addSignedUploadUrlToPart(part, undefined)
+        return lib.addSignedUploadUrlToPart(part, undefined)
       }
       if (
-        uploadPartCanUpload(
+        lib.uploadPartCanUpload(
           part,
           currentUploadCount,
           MAX_CONCURRENT_PART_UPLOADS
@@ -151,7 +72,7 @@ export const onUploadChanged = async (
       ) {
         currentUploadCount++
         changedParts = true
-        return addSignedUploadUrlToPart(
+        return lib.addSignedUploadUrlToPart(
           part,
           await IOMakeSignedS3URL({
             action: 'uploadPart',
@@ -160,18 +81,18 @@ export const onUploadChanged = async (
             expires: 900,
             upload_id: item.upload_id,
             part_number: part.part,
-          }).catch(() => undefined)
+          })
         )
       }
       return part
     })
     if (changedParts) {
       return modifyUpload(
-        updateUploadParts(item, await Promise.all(partUpdates))
+        lib.updateUploadParts(item, await Promise.all(partUpdates))
       )
     }
 
-    if (uploadHasAllPartsUploaded(item)) {
+    if (lib.uploadHasAllPartsUploaded(item)) {
       try {
         await IOCompleteMultipartUpload({
           bucket: Bucket,
@@ -182,9 +103,11 @@ export const onUploadChanged = async (
             PartNumber: p.part,
           })),
         })
-        return modifyUpload(await IOAddReadLinkToUpload(completeUpload(item)))
+        return modifyUpload(
+          await IOAddReadLinkToUpload(lib.completeUpload(item))
+        )
       } catch (err) {
-        return modifyUpload(changeUploadStatus(item, 'failed'))
+        return modifyUpload(lib.changeUploadStatus(item, 'failed'))
       }
     }
   }
@@ -194,15 +117,8 @@ export const onUploadChanged = async (
     return onPutUpload(item)
   }
 
-  const subscriptions = await getEventSubscriptionsByResource(item.resource_id)
-  const sendResults = await Promise.allSettled(
-    subscriptions.map((subscription) =>
-      IOSendMessageWS(
-        subscription.requestContext,
-        subscription.websocket_id,
-        JSON.stringify([item])
-      )
-    )
+  await IONotifySubscribers(
+    [item],
+    await IOgetEventSubscriptionsByResource(item.resource_id)
   )
-  IOLogRejectedPromises('onUploadChanged', sendResults)
 }

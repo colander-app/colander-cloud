@@ -1,12 +1,5 @@
 import { JSONSchemaType } from 'ajv'
-import { toBytes, toSeconds } from '@utils/converter'
-import { validateSchema } from '@utils/validate-schema'
-
-export const MAX_CONCURRENT_PART_UPLOADS = 2
-export const MAX_BYTES = toBytes(590, 'mb')
-export const UPLOAD_PART_SIZE = toBytes(5, 'mb')
-export const EXPIRE_UPLOAD_SECONDS = toSeconds(8, 'hr')
-export const EXPIRE_UPLOAD_READLINK = toSeconds(7, 'day')
+import { validateSchema } from '@/utils/validate-schema'
 
 export interface UploadPart {
   uploaded: boolean

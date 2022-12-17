@@ -1,13 +1,11 @@
 import { DynamoDB } from 'aws-sdk'
 import { DynamoDBStreamHandler } from 'aws-lambda'
-import { getItemsForResource } from '@lib/event'
-import { getEventSubscriptionsByResourceAndRange } from '@lib/eventSubscription'
-import { isEventSubscription } from '@models/eventSubscription'
-import { isEvent } from '@models/event'
-import { IOSendMessageWS } from '@services/websocket'
-import { isUpload } from '@models/upload'
-import { onUploadChanged } from '@controllers/upload'
-import { IOUpdateExpiredUploadReadLinks } from '@lib/upload/readLink'
+import { isEventSubscription } from '@/models/eventSubscription'
+import { isEvent } from '@/models/event'
+import { isUpload } from '@/models/upload'
+import { onUploadChanged } from '@/controllers/upload'
+import { onEventChanged } from '@/controllers/event'
+import { onEventSubscriptionChanged } from '@/controllers/eventSubscription'
 
 export const handler: DynamoDBStreamHandler = async (event) => {
   const record = event.Records[0]
@@ -16,38 +14,10 @@ export const handler: DynamoDBStreamHandler = async (event) => {
       const item: Readonly<Record<string, any>> = DynamoDB.Converter.unmarshall(
         record.dynamodb?.NewImage ?? {}
       )
-
-      /**
-       * Send items related to subscribed resources
-       */
       if (isEventSubscription(item)) {
-        const resource_items = await getItemsForResource(
-          item.subscription_resource_id
-        )
-        await IOUpdateExpiredUploadReadLinks(resource_items.filter(isUpload))
-        await IOSendMessageWS(
-          item.requestContext,
-          item.websocket_id,
-          JSON.stringify(resource_items)
-        )
+        await onEventSubscriptionChanged(item)
       } else if (isEvent(item)) {
-        /**
-         * Send updates to an event to all subscribers of it's resource
-         */
-        const subscriptions = await getEventSubscriptionsByResourceAndRange(
-          item.resource_id,
-          item.start_date,
-          item.end_date
-        )
-        await Promise.allSettled(
-          subscriptions.map((subscription) =>
-            IOSendMessageWS(
-              subscription.requestContext,
-              subscription.websocket_id,
-              JSON.stringify([item])
-            )
-          )
-        )
+        await onEventChanged(item)
       } else if (isUpload(item)) {
         await onUploadChanged(item)
       } else {

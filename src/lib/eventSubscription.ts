@@ -2,8 +2,8 @@ import { DynamoDB } from 'aws-sdk'
 import {
   IEventSubscription,
   isEventSubscription,
-} from '@models/eventSubscription'
-import { IOPutItem } from '@services/ddb'
+} from '@/models/eventSubscription'
+import { IOPutItem } from '@/services/ddb'
 
 const ddb = new DynamoDB.DocumentClient({
   apiVersion: '2012-08-10',
@@ -136,7 +136,7 @@ export const getEventSubscriptionsByResourceAndRange = async (
 /**
  * Query event subscriptions by resource id
  */
-export const getEventSubscriptionsByResource = async (
+export const IOgetEventSubscriptionsByResource = async (
   resource_id: string
 ): Promise<IEventSubscription[]> => {
   try {

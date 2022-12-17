@@ -1,17 +1,13 @@
 import { APIGatewayProxyHandler } from 'aws-lambda'
-import * as controller from '@controllers/upload'
-import {
-  getAPIGatewayEventBody,
-  proxyEventFailed,
-  proxyEventSuccess,
-} from '@utils/lambda/apigateway'
+import * as controller from '@/controllers/upload'
+import * as lambda from '@/utils/lambda/apigateway'
 
 export const onPutUpload: APIGatewayProxyHandler = async (event) => {
   try {
-    const { data } = getAPIGatewayEventBody(event)
+    const { data } = lambda.getAPIGatewayEventBody(event)
     await controller.onPutUpload(data)
   } catch (err) {
-    return proxyEventFailed(err)
+    return lambda.proxyEventFailed(err)
   }
-  return proxyEventSuccess()
+  return lambda.proxyEventSuccess()
 }

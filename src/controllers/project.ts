@@ -1,7 +1,7 @@
-import { isProject } from '@models/project'
-import { IOPutItem } from '@services/ddb'
+import { isProject } from '@/models/project'
+import { IOPutItem } from '@/services/ddb'
 
-export const putProject = async (item: unknown): Promise<void> => {
+export const onPutProject = async (item: unknown): Promise<void> => {
   if (!isProject(item)) {
     throw new Error('Not a valid project')
   }

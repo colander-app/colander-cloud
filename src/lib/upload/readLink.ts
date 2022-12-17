@@ -1,8 +1,9 @@
-import { onPutUpload } from '@controllers/upload'
-import { EXPIRE_UPLOAD_READLINK, IUpload } from '@models/upload'
-import { IOLogRejectedPromises } from '@services/log'
-import { IOMakeSignedS3URL } from '@services/s3'
-import { getExpiryInSeconds } from '@utils/date'
+import { onPutUpload } from '@/controllers/upload'
+import { IUpload } from '@/models/upload'
+import { IOLogRejectedPromises } from '@/services/log'
+import { IOMakeSignedS3URL } from '@/services/s3'
+import { getExpiryInSeconds } from '@/utils/date'
+import { EXPIRE_UPLOAD_READLINK } from './constants'
 
 const doesUploadNeedReadLink = (upload: IUpload) => {
   if (upload.status !== 'complete') {

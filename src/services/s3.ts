@@ -16,11 +16,15 @@ export const IOMakeSignedS3URL = async ({
   bucket,
   key,
   expires,
+  upload_id,
+  part_number,
 }: MakeSignedS3UrlDeps): Promise<string> => {
   const url = await s3.getSignedUrlPromise(action, {
     Bucket: bucket,
     Key: key,
     Expires: expires,
+    UploadId: upload_id,
+    PartNumber: part_number,
   })
 
   if (!url) {

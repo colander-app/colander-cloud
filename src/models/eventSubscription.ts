@@ -1,5 +1,5 @@
 import { JSONSchemaType } from 'ajv'
-import { validateSchema } from '@utils/validate-schema'
+import { validateSchema } from '@/utils/validate-schema'
 
 export interface IEventSubscription {
   __type: 'eventSubscription'

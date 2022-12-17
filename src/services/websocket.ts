@@ -1,5 +1,7 @@
+import { IEventSubscription } from '@/models/eventSubscription'
 import { APIGatewayProxyEvent } from 'aws-lambda'
 import { ApiGatewayManagementApi } from 'aws-sdk'
+import { IOLogRejectedPromises } from './log'
 
 export const enum ErrorResponses {
   NonExistent = 'NonExistent',
@@ -46,4 +48,20 @@ export const IOSendMessageWS = async (
     return ErrorResponses.Failed
   }
   return null
+}
+
+export const IONotifySubscribers = async (
+  items: unknown[],
+  subscriptions: IEventSubscription[]
+): Promise<void> => {
+  const sendResults = await Promise.allSettled(
+    subscriptions.map((subscription) =>
+      IOSendMessageWS(
+        subscription.requestContext,
+        subscription.websocket_id,
+        JSON.stringify(items)
+      )
+    )
+  )
+  IOLogRejectedPromises('onUploadChanged', sendResults)
 }

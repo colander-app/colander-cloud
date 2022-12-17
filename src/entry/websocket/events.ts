@@ -1,34 +1,30 @@
 import { APIGatewayProxyHandler } from 'aws-lambda'
-import { putEvent } from '@lib/event'
 import {
   putEventSubscription,
   removeEventSubscriptionByResource,
-} from '@lib/eventSubscription'
-import { toSeconds } from '@utils/converter'
-import { getExpiryInSeconds } from '@utils/date'
-import {
-  getAPIGatewayEventBody,
-  proxyEventFailed,
-  proxyEventSuccess,
-} from '@utils/lambda/apigateway'
+} from '@/lib/eventSubscription'
+import { toSeconds } from '@/utils/converter'
+import { getExpiryInSeconds } from '@/utils/date'
+import * as controller from '@/controllers/event'
+import * as lambda from '@/utils/lambda/apigateway'
 
 const EXPIRE_SUBSCRIPTION_SECONDS = toSeconds(2, 'hr')
 
 export const onPutEvent: APIGatewayProxyHandler = async (event) => {
   try {
-    const { data } = getAPIGatewayEventBody(event)
-    await putEvent(data)
+    const { data } = lambda.getAPIGatewayEventBody(event)
+    await controller.onPutEvent(data)
   } catch (err) {
-    return proxyEventFailed(err)
+    return lambda.proxyEventFailed(err)
   }
-  return proxyEventSuccess()
+  return lambda.proxyEventSuccess()
 }
 
 export const onSubscribeToEventRange: APIGatewayProxyHandler = async (
   event
 ) => {
   try {
-    const { query } = getAPIGatewayEventBody(event)
+    const { query } = lambda.getAPIGatewayEventBody(event)
     const requestContext = {
       connectionId: event.requestContext.connectionId,
       domainName: event.requestContext.domainName,
@@ -44,23 +40,23 @@ export const onSubscribeToEventRange: APIGatewayProxyHandler = async (
     )
     console.log(await Promise.allSettled(requests))
   } catch (err) {
-    return proxyEventFailed(err)
+    return lambda.proxyEventFailed(err)
   }
-  return proxyEventSuccess()
+  return lambda.proxyEventSuccess()
 }
 
 export const onUnsubscribeFromEventRange: APIGatewayProxyHandler = async (
   event
 ) => {
   try {
-    const { data } = getAPIGatewayEventBody(event)
+    const { data } = lambda.getAPIGatewayEventBody(event)
     const { connectionId } = event.requestContext
     const requests = data.resource_ids.map((id) =>
       removeEventSubscriptionByResource(connectionId!, id)
     )
     await Promise.allSettled(requests)
   } catch (err) {
-    return proxyEventFailed(err)
+    return lambda.proxyEventFailed(err)
   }
-  return proxyEventSuccess()
+  return lambda.proxyEventSuccess()
 }

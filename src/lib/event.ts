@@ -1,18 +1,10 @@
 import { DynamoDB } from 'aws-sdk'
-import { IEvent, isEvent } from '@models/event'
-import { IOPutItem } from '@services/ddb'
+import { IEvent } from '@/models/event'
 
 const ddb = new DynamoDB.DocumentClient({
   apiVersion: '2012-08-10',
   region: process.env.AWS_REGION,
 })
-
-export const putEvent = async (item: unknown): Promise<void> => {
-  if (!isEvent(item)) {
-    throw new Error('Not a valid event')
-  }
-  await IOPutItem('Event', item)
-}
 
 export const getItemsForResource = async (
   resource_id: string
