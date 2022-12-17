@@ -32,6 +32,7 @@ custom:
 plugins:
   - serverless-webpack
   - serverless-dynamodb-autoscaling
+  - serverless-tscpaths
   # - serverless-iam-roles-per-function
 
 provider:

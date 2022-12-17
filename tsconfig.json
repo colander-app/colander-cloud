@@ -11,12 +11,7 @@
     "strictNullChecks": true,
     "baseUrl": ".",
     "paths": {
-      "@entry/*": ["./src/entry/*"],
-      "@models/*": ["./src/models/*"],
-      "@controllers/*": ["./src/controllers/*"],
-      "@lib/*": ["./src/lib/*"],
-      "@services/*": ["./src/services/*"],
-      "@utils/*": ["./src/utils/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["./**/*.ts"],
