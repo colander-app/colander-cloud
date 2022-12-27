@@ -1,14 +1,12 @@
 import { APIGatewayProxyHandler } from 'aws-lambda'
-import {
-  putEventSubscription,
-  removeEventSubscriptionByResource,
-} from '@/lib/eventSubscription'
+import { removeEventSubscriptionByResource } from '@/lib/eventSubscription'
 import { toSeconds } from '@/utils/converter'
 import { getExpiryInSeconds } from '@/utils/date'
 import * as controller from '@/controllers/event'
 import * as lambda from '@/utils/lambda/apigateway'
+import { onPutEventSubscription } from '@/controllers/eventSubscription'
 
-const EXPIRE_SUBSCRIPTION_SECONDS = toSeconds(2, 'hr')
+const EXPIRE_EVENT_SUBSCRIPTION_SECONDS = toSeconds(2, 'hr')
 
 export const onPutEvent: APIGatewayProxyHandler = async (event) => {
   try {
@@ -32,10 +30,10 @@ export const onSubscribeToEventRange: APIGatewayProxyHandler = async (
     }
     const { resource_ids, ...restOfQuery } = query
     const requests = resource_ids.map((resource_id) =>
-      putEventSubscription(
+      onPutEventSubscription(
         requestContext,
         { resource_id, ...restOfQuery },
-        getExpiryInSeconds(EXPIRE_SUBSCRIPTION_SECONDS)
+        getExpiryInSeconds(EXPIRE_EVENT_SUBSCRIPTION_SECONDS)
       )
     )
     console.log(await Promise.allSettled(requests))

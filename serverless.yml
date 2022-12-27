@@ -32,7 +32,7 @@ custom:
 plugins:
   - serverless-webpack
   - serverless-dynamodb-autoscaling
-  - serverless-tscpaths
+  # - serverless-tscpaths
   # - serverless-iam-roles-per-function
 
 provider:
@@ -107,16 +107,19 @@ functions:
     events:
       - websocket:
           route: subscribeToEventRange
+
   unsubscribeFromEventRange:
     handler: src/entry/websocket/events.onUnsubscribeFromEventRange
     events:
       - websocket:
           route: unsubscribeFromEventRange
+
   putEvent:
     handler: src/entry/websocket/events.onPutEvent
     events:
       - websocket:
           route: putEvent
+
   eventStreamHandler:
     handler: src/entry/dynamo/events.handler
     events:
@@ -153,6 +156,29 @@ functions:
       - websocket:
           route: putOrganization
 
+  subscribeToOrganization:
+    handler: src/entry/websocket/orgSubscriptions.onSubscribeToOrganization
+    events:
+      - websocket:
+          route: subscribeToOrganization
+
+  unsubscribeFromOrganization:
+    handler: src/entry/websocket/orgSubscriptions.onUnsubscribeFromOrganization
+    events:
+      - websocket:
+          route: unsubscribeFromOrganization
+
+  organizationStreamHandler:
+    handler: src/entry/dynamo/organizations.handler
+    events:
+      - stream:
+          type: dynamodb
+          batchSize: 1
+          startingPosition: LATEST
+          arn:
+            Fn::GetAtt:
+              - organizationTable
+              - StreamArn
 resources:
   Resources:
     #
@@ -172,6 +198,8 @@ resources:
             AttributeType: S
           - AttributeName: organization_id
             AttributeType: S
+          - AttributeName: websocket_id
+            AttributeType: S
         KeySchema:
           - AttributeName: id
             KeyType: HASH
@@ -187,6 +215,22 @@ resources:
                 KeyType: RANGE
             Projection:
               ProjectionType: 'KEYS_ONLY'
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          #
+          # Group subscriptions by organization
+          #
+          - IndexName: SubscriptionByOrganization
+            KeySchema:
+              - AttributeName: organization_id
+                KeyType: HASH
+              - AttributeName: websocket_id
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'INCLUDE'
+              NonKeyAttributes:
+                - requestContext
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1

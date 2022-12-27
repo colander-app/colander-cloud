@@ -52,7 +52,7 @@ export const IOSendMessageWS = async (
 
 export const IONotifySubscribers = async (
   items: unknown[],
-  subscriptions: IEventSubscription[]
+  subscriptions: Pick<IEventSubscription, 'websocket_id' | 'requestContext'>[]
 ): Promise<void> => {
   const sendResults = await Promise.allSettled(
     subscriptions.map((subscription) =>

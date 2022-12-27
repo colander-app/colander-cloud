@@ -15,25 +15,3 @@ export const onPutOrganization: APIGatewayProxyHandler = async (event) => {
   }
   return proxyEventSuccess()
 }
-
-export const onSubscribeToOrganization: APIGatewayProxyHandler = async (
-  event
-) => {
-  try {
-    // create organization subscription, which sends updates to orgs and resources
-  } catch (err) {
-    return proxyEventFailed(err)
-  }
-  return proxyEventSuccess()
-}
-
-export const onUnsubscribeFromOrganization: APIGatewayProxyHandler = async (
-  event
-) => {
-  try {
-    // create organization subscription, which sends updates to orgs and resources
-  } catch (err) {
-    return proxyEventFailed(err)
-  }
-  return proxyEventSuccess()
-}

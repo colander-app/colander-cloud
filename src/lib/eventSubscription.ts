@@ -1,46 +1,10 @@
 import { DynamoDB } from 'aws-sdk'
-import {
-  IEventSubscription,
-  isEventSubscription,
-} from '@/models/eventSubscription'
-import { IOPutItem } from '@/services/ddb'
+import { IEventSubscription } from '@/models/eventSubscription'
 
 const ddb = new DynamoDB.DocumentClient({
   apiVersion: '2012-08-10',
   region: process.env.AWS_REGION,
 })
-
-export const putEventSubscription = async (
-  requestContext: {
-    connectionId?: string
-    domainName?: string
-    stage?: string
-  },
-  query: {
-    resource_id: string
-    start_date: string
-    end_date: string
-  },
-  expire_at: number
-): Promise<void> => {
-  const subscription = {
-    __type: 'eventSubscription',
-    id: `${requestContext.connectionId}_${query.resource_id}`,
-    websocket_id: requestContext.connectionId,
-    requestContext,
-    expire_at,
-    subscription_resource_id: query.resource_id,
-    query: {
-      resource_id: query.resource_id,
-      start_date: query.start_date,
-      end_date: query.end_date,
-    },
-  }
-  if (!isEventSubscription(subscription)) {
-    throw new Error('Invalid subscription format')
-  }
-  await IOPutItem('Event', subscription)
-}
 
 export const removeEventSubscriptionByResource = async (
   connection_id: string,
