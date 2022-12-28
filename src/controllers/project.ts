@@ -7,7 +7,7 @@ export const onPutProject = async (item: unknown): Promise<void> => {
   if (!isProject(item)) {
     throw new Error('Not a valid project')
   }
-  await IOPutItem('Event', item)
+  await IOPutItem('Organization', item)
 }
 
 export const onProjectChanged = async (item: IProject) => {
