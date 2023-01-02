@@ -6,6 +6,7 @@ export interface IEvent {
   id: string
   resource_id: string
   start_date: string
+  project_id?: string
   end_date: string
   label: string
   color: string
@@ -19,6 +20,7 @@ const schema: JSONSchemaType<IEvent> = {
     __type: { type: 'string', const: 'event' },
     id: { type: 'string' },
     resource_id: { type: 'string' },
+    project_id: { type: 'string', nullable: true },
     start_date: { type: 'string' },
     end_date: { type: 'string' },
     label: { type: 'string' },
