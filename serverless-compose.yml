@@ -1,0 +1,16 @@
+services:
+  anonymous:
+    path: anonymous
+
+  websocket:
+    path: websocket
+
+  event:
+    path: event
+    params:
+      websocketApiId: ${websocket.appWebsocketApiId}
+
+  organization:
+    path: organization
+    params:
+      websocketApiId: ${websocket.appWebsocketApiId}

@@ -1,0 +1,149 @@
+service: organization
+
+custom:
+  stage: ${opt:stage, 'dev'}
+  organizationTableName: organization-${self:custom.stage}
+  webpack:
+    webpackConfig: ./webpack.config.js
+    includeModules:
+      forceExclude:
+        - aws-sdk
+    packager: 'yarn'
+  capacities:
+    - table: organizationTable
+      index:
+        - ItemByOrganization
+      read:
+        minimum: 1
+        maximum: 10
+        usage: 0.90
+
+plugins:
+  - serverless-webpack
+  - serverless-dynamodb-autoscaling
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  region: us-east-1
+  apiGateway:
+    minimumCompressionSize: 1024 # Enable gzip compression for responses > 1 KB
+    websocketApiId: ${param:websocketApiId}
+  environment:
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+    ORGANIZATION_TABLE_NAME: ${self:custom.organizationTableName}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - 'dynamodb:DescribeTable'
+        - 'dynamodb:Query'
+        - 'dynamodb:BatchGetItem'
+        - 'dynamodb:BatchWriteItem'
+        - 'dynamodb:PutItem'
+        - 'dynamodb:UpdateItem'
+        - 'dynamodb:DeleteItem'
+      Resource:
+        - {
+            'Fn::Join':
+              [
+                '',
+                [{ 'Fn::GetAtt': ['organizationTable', 'Arn'] }, '/index/*'],
+              ],
+          }
+        - { 'Fn::GetAtt': ['organizationTable', 'Arn'] }
+
+functions:
+  putOrganization:
+    handler: src/entry/websocket/organizations.onPutOrganization
+    events:
+      - websocket:
+          route: putOrganization
+
+  putResource:
+    handler: src/entry/websocket/resources.onPutResource
+    events:
+      - websocket:
+          route: putResource
+
+  putProject:
+    handler: src/entry/websocket/projects.onPutProject
+    events:
+      - websocket:
+          route: putProject
+
+  subscribeToOrganization:
+    handler: src/entry/websocket/orgSubscriptions.onSubscribeToOrganization
+    events:
+      - websocket:
+          route: subscribeToOrganization
+
+  unsubscribeFromOrganization:
+    handler: src/entry/websocket/orgSubscriptions.onUnsubscribeFromOrganization
+    events:
+      - websocket:
+          route: unsubscribeFromOrganization
+
+  organizationStreamHandler:
+    handler: src/entry/dynamo/organizations.handler
+    events:
+      - stream:
+          type: dynamodb
+          batchSize: 1
+          startingPosition: LATEST
+          arn:
+            Fn::GetAtt:
+              - organizationTable
+              - StreamArn
+
+resources:
+  Resources:
+    organizationTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.organizationTableName}
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: organization_id
+            AttributeType: S
+          - AttributeName: websocket_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          #
+          # Group items that are related to an organization
+          #
+          - IndexName: ItemByOrganization
+            KeySchema:
+              - AttributeName: organization_id
+                KeyType: HASH
+              - AttributeName: id
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'KEYS_ONLY'
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          #
+          # Group subscriptions by organization
+          #
+          - IndexName: SubscriptionByOrganization
+            KeySchema:
+              - AttributeName: organization_id
+                KeyType: HASH
+              - AttributeName: websocket_id
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'INCLUDE'
+              NonKeyAttributes:
+                - requestContext
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1

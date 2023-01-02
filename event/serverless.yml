@@ -1,0 +1,237 @@
+service: event
+
+custom:
+  stage: ${opt:stage, 'dev'}
+  eventTableName: event-${self:custom.stage}
+  uploadBucketName: colander-uploads-${self:custom.stage}
+  allowedS3Origins:
+    - 'https://*.colanderapp.io'
+    - 'http://local.colanderapp.io:5173'
+  webpack:
+    webpackConfig: ./webpack.config.js
+    includeModules:
+      forceExclude:
+        - aws-sdk
+    packager: 'yarn'
+  capacities:
+    - table: eventTable
+      index:
+        - EventByResourceStartDate
+        - EventByResourceEndDate
+        - WsSubscriptionById
+        - SubscriptionByResource
+        - ItemByResource
+      read:
+        minimum: 2
+        maximum: 10
+        usage: 0.85
+      write:
+        minimum: 2
+        maximum: 10
+        usage: 0.85
+
+plugins:
+  - serverless-webpack
+  - serverless-dynamodb-autoscaling
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  region: us-east-1
+  apiGateway:
+    minimumCompressionSize: 1024 # Enable gzip compression for responses > 1 KB
+    websocketApiId: ${param:websocketApiId}
+  environment:
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+    EVENT_TABLE_NAME: ${self:custom.eventTableName}
+    UPLOAD_BUCKET_NAME: ${self:custom.uploadBucketName}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - 'dynamodb:DescribeTable'
+        - 'dynamodb:Query'
+        - 'dynamodb:BatchGetItem'
+        - 'dynamodb:BatchWriteItem'
+        - 'dynamodb:PutItem'
+        - 'dynamodb:UpdateItem'
+        - 'dynamodb:DeleteItem'
+      Resource:
+        - {
+            'Fn::Join':
+              ['', [{ 'Fn::GetAtt': ['eventTable', 'Arn'] }, '/index/*']],
+          }
+        - { 'Fn::GetAtt': ['eventTable', 'Arn'] }
+    - Effect: Allow
+      Action:
+        - 's3:PutObject'
+        - 's3:GetObject'
+        - 's3:DeleteObject'
+        - 's3:AbortMultipartUpload'
+        - 's3:ListMultipartUploadParts'
+        - 's3:ListBucketMultipartUploads'
+      Resource:
+        - { 'Fn::GetAtt': ['uploadsBucket', 'Arn'] }
+        - {
+            'Fn::Join':
+              ['', [{ 'Fn::GetAtt': ['uploadsBucket', 'Arn'] }, '/*']],
+          }
+
+functions:
+  putUpload:
+    handler: src/entry/websocket/upload.onPutUpload
+    events:
+      - websocket:
+          route: putUpload
+
+  putEvent:
+    handler: src/entry/websocket/events.onPutEvent
+    events:
+      - websocket:
+          route: putEvent
+
+  subscribeToEventRange:
+    handler: src/entry/websocket/events.onSubscribeToEventRange
+    events:
+      - websocket:
+          route: subscribeToEventRange
+
+  unsubscribeFromEventRange:
+    handler: src/entry/websocket/events.onUnsubscribeFromEventRange
+    events:
+      - websocket:
+          route: unsubscribeFromEventRange
+
+  eventStreamHandler:
+    handler: src/entry/dynamo/events.handler
+    events:
+      - stream:
+          type: dynamodb
+          batchSize: 1
+          startingPosition: LATEST
+          arn:
+            Fn::GetAtt:
+              - eventTable
+              - StreamArn
+
+resources:
+  Resources:
+    eventTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.eventTableName}
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TimeToLiveSpecification:
+          AttributeName: expire_at
+          Enabled: true
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: resource_id
+            AttributeType: S
+          - AttributeName: subscription_resource_id
+            AttributeType: S
+          - AttributeName: websocket_id
+            AttributeType: S
+          - AttributeName: start_date
+            AttributeType: S
+          - AttributeName: end_date
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          #
+          # Index events by resource, sort by start date. Only keys included.
+          #
+          - IndexName: EventByResourceStartDate
+            KeySchema:
+              - AttributeName: resource_id
+                KeyType: HASH
+              - AttributeName: start_date
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'KEYS_ONLY'
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          #
+          # Index events by resource, sort by end date. Only keys included.
+          #
+          - IndexName: EventByResourceEndDate
+            KeySchema:
+              - AttributeName: resource_id
+                KeyType: HASH
+              - AttributeName: end_date
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'KEYS_ONLY'
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          #
+          # Index ws subscriptions by connection id.
+          # This is useful for managing subscriptions for a single ws connection.
+          #
+          - IndexName: WsSubscriptionById
+            KeySchema:
+              - AttributeName: websocket_id
+                KeyType: HASH
+              - AttributeName: id
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'KEYS_ONLY'
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          #
+          # Contains websocket subscriptions by resource id
+          #
+          - IndexName: SubscriptionByResource
+            KeySchema:
+              - AttributeName: subscription_resource_id
+                KeyType: HASH
+              - AttributeName: websocket_id
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'INCLUDE'
+              NonKeyAttributes:
+                - requestContext
+                - query
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          #
+          # Contains all items for a given resource
+          #
+          - IndexName: ItemByResource
+            KeySchema:
+              - AttributeName: resource_id
+                KeyType: HASH
+              - AttributeName: id
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'KEYS_ONLY'
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+    uploadsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.uploadBucketName}
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+        CorsConfiguration:
+          CorsRules:
+            - AllowedMethods:
+                - GET
+                - HEAD
+                - PUT
+              ExposedHeaders:
+                - ETag
+              AllowedOrigins: ${self:custom.allowedS3Origins}

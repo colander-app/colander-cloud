@@ -1,0 +1,102 @@
+service: anonymous
+
+custom:
+  stage: ${opt:stage, 'dev'}
+  authWebsocketApiName: AuthWebsocketApi-${self:custom.stage}
+  authTableName: auth-${self:custom.stage}
+  webpack:
+    webpackConfig: ./webpack.config.js
+    includeModules:
+      forceExclude:
+        - aws-sdk
+    packager: 'yarn'
+  capacities:
+    - table: authTable
+      read:
+        minimum: 2
+        maximum: 10
+        usage: 0.85
+      write:
+        minimum: 2
+        maximum: 10
+        usage: 0.85
+
+plugins:
+  - serverless-webpack
+  - serverless-dynamodb-autoscaling
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  region: us-east-1
+  websocketsApiName: ${self:custom.authWebsocketApiName}
+  websocketsApiRouteSelectionExpression: $request.body.action
+  apiGateway:
+    minimumCompressionSize: 1024 # Enable gzip compression for responses > 1 KB
+  environment:
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - 'ses:SendEmail'
+        - 'ses:SendRawEmail'
+      Resource: '*'
+    - Effect: Allow
+      Action:
+        - 'dynamodb:DescribeTable'
+        - 'dynamodb:Query'
+        - 'dynamodb:BatchGetItem'
+        - 'dynamodb:BatchWriteItem'
+        - 'dynamodb:PutItem'
+        - 'dynamodb:UpdateItem'
+        - 'dynamodb:DeleteItem'
+      Resource:
+        - {
+            'Fn::Join':
+              ['', [{ 'Fn::GetAtt': ['authTable', 'Arn'] }, '/index/*']],
+          }
+        - { 'Fn::GetAtt': ['authTable', 'Arn'] }
+
+functions:
+  initMagicLogin:
+    handler: src/entry/websocket/magic.initMagicLogin
+    events:
+      - websocket:
+          route: initMagicLogin
+  completeMagicLogin:
+    handler: src/entry/websocket/magic.completeMagicLogin
+    events:
+      - websocket:
+          route: completeMagicLogin
+  authTableStreamHandler:
+    handler: src/entry/dynamo/auth.handler
+    events:
+      - stream:
+          type: dynamodb
+          batchSize: 1
+          startingPosition: LATEST
+          arn:
+            Fn::GetAtt:
+              - authTable
+              - StreamArn
+
+resources:
+  Resources:
+    authTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.authTableName}
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TimeToLiveSpecification:
+          AttributeName: expire_at
+          Enabled: true
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH

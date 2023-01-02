@@ -1,0 +1,43 @@
+service: websocket
+
+custom:
+  stage: ${opt:stage, 'dev'}
+  appWebsocketApiName: AppWebsocketApi-${self:custom.stage}
+  webpack:
+    webpackConfig: ./webpack.config.js
+    includeModules:
+      forceExclude:
+        - aws-sdk
+    packager: 'yarn'
+
+plugins:
+  - serverless-webpack
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  region: us-east-1
+  websocketsApiName: ${self:custom.appWebsocketApiName}
+  websocketsApiRouteSelectionExpression: $request.body.action
+
+functions:
+  authorizer:
+    handler: src/entry/websocket/authorizer.handler
+  connect:
+    handler: src/entry/websocket/connect.handler
+    events:
+      - websocket:
+          route: $connect
+          authorizer:
+            name: authorizer
+            identitySource:
+              - 'route.request.header.Auth'
+              - 'route.request.querystring.Auth'
+
+resources:
+  Outputs:
+    appWebsocketApiId:
+      Value:
+        Ref: WebsocketsApi
+      Export:
+        Name: appWebsocketApiId
