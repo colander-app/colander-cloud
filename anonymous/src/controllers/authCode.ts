@@ -7,8 +7,9 @@ const sesv2 = new SESV2({
 
 export const onAuthCodeChanged = async (item: IAuthCode) => {
   const subject = `New Login Code: ${item.code}`
-  const htmlBody = `Your login code is <b>${item.code}</b>.`
-  const textBody = `Your login code is: ${item.code}`
+  const expire_at_str = new Date(item.expire_at * 1000)
+  const htmlBody = `Your login code is <b>${item.code}</b>.<br /><br />Code will expire at <b>${expire_at_str}</b>`
+  const textBody = `Your login code is: ${item.code}. Code will expire at ${expire_at_str}`
   const toAddress = item.email
   const fromAddress = 'auth@mail.colanderapp.io'
   await sesv2

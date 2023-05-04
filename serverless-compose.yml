@@ -1,9 +1,15 @@
 services:
   anonymous:
     path: anonymous
+    params:
+      rootDomain: colanderapp.io
+      jwtSigningSecret: shhh
 
   websocket:
     path: websocket
+    params:
+      rootDomain: colanderapp.io
+      jwtSigningSecret: shhh
 
   event:
     path: event

@@ -3,6 +3,16 @@ service: websocket
 custom:
   stage: ${opt:stage, 'dev'}
   appWebsocketApiName: AppWebsocketApi-${self:custom.stage}
+  jwtSigningSecret: ${param:jwtSigningSecret}
+  customDomain:
+    domainName: ws.${self:custom.stage}.${param:rootDomain}
+    basePath: ${self:custom.stage}
+    certificateName: ${self:custom.stage}.${param:rootDomain}
+    createRoute53Record: true
+    createRoute53IPv6Record: true
+    endpointType: REGIONAL
+    securityPolicy: tls_1_2
+    apiType: websocket
   webpack:
     webpackConfig: ./webpack.config.js
     includeModules:
@@ -12,6 +22,7 @@ custom:
 
 plugins:
   - serverless-webpack
+  - serverless-domain-manager
 
 provider:
   name: aws
@@ -19,6 +30,9 @@ provider:
   region: us-east-1
   websocketsApiName: ${self:custom.appWebsocketApiName}
   websocketsApiRouteSelectionExpression: $request.body.action
+  environment:
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+    JWT_SIGNING_SECRET: ${self:custom.jwtSigningSecret}
 
 functions:
   authorizer:
@@ -31,7 +45,6 @@ functions:
           authorizer:
             name: authorizer
             identitySource:
-              - 'route.request.header.Auth'
               - 'route.request.querystring.Auth'
 
 resources:

@@ -4,6 +4,16 @@ custom:
   stage: ${opt:stage, 'dev'}
   authWebsocketApiName: AuthWebsocketApi-${self:custom.stage}
   authTableName: auth-${self:custom.stage}
+  jwtSigningSecret: ${param:jwtSigningSecret}
+  customDomain:
+    domainName: auth.${self:custom.stage}.${param:rootDomain}
+    basePath: ${self:custom.stage}
+    certificateName: ${self:custom.stage}.${param:rootDomain}
+    createRoute53Record: true
+    createRoute53IPv6Record: true
+    endpointType: REGIONAL
+    securityPolicy: tls_1_2
+    apiType: websocket
   webpack:
     webpackConfig: ./webpack.config.js
     includeModules:
@@ -23,6 +33,7 @@ custom:
 
 plugins:
   - serverless-webpack
+  - serverless-domain-manager
   - serverless-dynamodb-autoscaling
 
 provider:
@@ -35,7 +46,14 @@ provider:
     minimumCompressionSize: 1024 # Enable gzip compression for responses > 1 KB
   environment:
     AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+    AUTH_TABLE_NAME: ${self:custom.authTableName}
+    JWT_SIGNING_SECRET: ${self:custom.jwtSigningSecret}
   iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - 'execute-api:ManageConnections'
+      Resource:
+        - 'arn:aws:execute-api:*:*:*'
     - Effect: Allow
       Action:
         - 'ses:SendEmail'
@@ -63,11 +81,21 @@ functions:
     events:
       - websocket:
           route: initMagicLogin
+
   completeMagicLogin:
     handler: src/entry/websocket/magic.completeMagicLogin
     events:
       - websocket:
           route: completeMagicLogin
+          routeResponseSelectionExpression: $default
+
+  refreshToken:
+    handler: src/entry/websocket/refreshToken.refreshToken
+    events:
+      - websocket:
+          route: refreshToken
+          routeResponseSelectionExpression: $default
+
   authTableStreamHandler:
     handler: src/entry/dynamo/auth.handler
     events:
@@ -97,6 +125,45 @@ resources:
         AttributeDefinitions:
           - AttributeName: id
             AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+          - AttributeName: code
+            AttributeType: S
+          - AttributeName: family_id
+            AttributeType: S
+          - AttributeName: refresh_token
+            AttributeType: S
         KeySchema:
           - AttributeName: id
             KeyType: HASH
+        GlobalSecondaryIndexes:
+          #
+          # Auth codes indexed by email
+          #
+          - IndexName: AuthCodeByEmail
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+              - AttributeName: code
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'INCLUDE'
+              NonKeyAttributes:
+                - expire_at
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          #
+          # Tokens by family id
+          #
+          - IndexName: TokenByFamily
+            KeySchema:
+              - AttributeName: family_id
+                KeyType: HASH
+              - AttributeName: refresh_token
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'ALL'
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1

@@ -20,12 +20,16 @@ export const getItemsForResource = async (
   const key_items = (await ddb.query(query).promise()).Items ?? []
   const key_item_ids = key_items.map(({ id }) => ({ id })) ?? []
 
+  if (key_item_ids.length === 0) {
+    return []
+  }
+
   const items =
     (
       await ddb
         .batchGet({
           RequestItems: {
-            Event: {
+            [process.env.EVENT_TABLE_NAME!]: {
               Keys: key_item_ids,
             },
           },
@@ -76,13 +80,17 @@ export const getEventsInRange = async (
     .map((r) => r.id)
     .filter((id, i, arr) => arr.indexOf(id) === i)
 
+  if (event_ids.length === 0) {
+    return []
+  }
+
   // Get all event details
   const events =
     (
       await ddb
         .batchGet({
           RequestItems: {
-            Event: {
+            [process.env.EVENT_TABLE_NAME!]: {
               Keys: event_ids.map((id) => ({ id })),
             },
           },

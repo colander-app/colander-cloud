@@ -27,7 +27,7 @@ export const removeEventSubscriptionByResource = async (
   if (delete_requests) {
     await ddb.batchWrite({
       RequestItems: {
-        Event: delete_requests,
+        [process.env.EVENT_TABLE_NAME!]: delete_requests,
       },
     })
     console.log('deleted', delete_requests.length, 'items')

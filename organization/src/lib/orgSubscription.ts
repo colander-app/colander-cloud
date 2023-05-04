@@ -20,12 +20,16 @@ export const getItemsForOrg = async (
   const key_items = (await ddb.query(query).promise()).Items ?? []
   const key_item_ids = key_items.map(({ id }) => ({ id })) ?? []
 
+  if (key_item_ids.length === 0) {
+    return []
+  }
+
   const items =
     (
       await ddb
         .batchGet({
           RequestItems: {
-            Organization: {
+            [process.env.ORGANIZATION_TABLE_NAME!]: {
               Keys: key_item_ids,
             },
           },

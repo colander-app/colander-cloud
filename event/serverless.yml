@@ -48,10 +48,16 @@ provider:
   iamRoleStatements:
     - Effect: Allow
       Action:
+        - 'execute-api:ManageConnections'
+      Resource:
+        - 'arn:aws:execute-api:*:*:*'
+    - Effect: Allow
+      Action:
         - 'dynamodb:DescribeTable'
         - 'dynamodb:Query'
         - 'dynamodb:BatchGetItem'
         - 'dynamodb:BatchWriteItem'
+        - 'dynamodb:GetItem'
         - 'dynamodb:PutItem'
         - 'dynamodb:UpdateItem'
         - 'dynamodb:DeleteItem'

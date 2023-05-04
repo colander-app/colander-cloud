@@ -38,13 +38,13 @@ export const IOConditionalPut = async <T extends { id: string }>(
   table_name: string,
   item: any,
   validator: (item: any) => item is T,
-  authorizer: (previous: T, next: T) => boolean
+  authorizer: (previous: T | undefined, next: T | undefined) => boolean
 ): Promise<void> => {
-  if (!validator(item)) {
+  if (item !== undefined && !validator(item)) {
     throw new Error('input validation failed')
   }
   const old_item = await IOGetItemById(table_name, item.id)
-  if (!validator(old_item)) {
+  if (old_item !== undefined && !validator(old_item)) {
     throw new Error('existing record by id is not of expected type')
   }
   if (authorizer(item, old_item)) {
