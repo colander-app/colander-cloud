@@ -26,5 +26,6 @@ export const proxyEventFailed = (
       ? error
       : error?.message ?? error ?? 'Unknown failure'
   console.log('Failed with message', body)
+  console.error(error)
   return { statusCode, body }
 }

@@ -47,7 +47,7 @@ export const IOConditionalPut = async <T extends { id: string }>(
   if (old_item !== undefined && !validator(old_item)) {
     throw new Error('existing record by id is not of expected type')
   }
-  if (authorizer(item, old_item)) {
+  if (authorizer(old_item, item)) {
     return IOPutItem(table_name, item)
   }
 }
